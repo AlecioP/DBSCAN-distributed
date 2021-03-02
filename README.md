@@ -33,7 +33,7 @@ in *DS* sono stati etichettati.<br>
     
 </p>
 
-![title](img/visual.gif)
+![title](https://github.com/AlecioP/DBSCAN-distributed/blob/main/img/Visual.gif)
 
 ## Implementazione
 
