@@ -33,7 +33,11 @@ in *DS* sono stati etichettati.<br>
     
 </p>
 
-![title](img/visual.gif)
+![title](https://github.com/AlecioP/DBSCAN-distributed/blob/main/img/Visual.gif)
+
+<p> 
+<a href="https://towardsdatascience.com/the-5-clustering-algorithms-data-scientists-need-to-know-a36d136ef68"> Image From Here </a>
+</p>
 
 ## Implementazione
 
