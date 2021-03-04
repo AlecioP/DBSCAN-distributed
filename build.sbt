@@ -39,3 +39,26 @@ libraryDependencies += "org.apache.spark" %% "spark-core" % sparkVersion % "prov
 artifactName := { (sv: ScalaVersion, module: ModuleID, artifact: Artifact) =>
   artifact.name + "_" + sv.binary + "-" + sparkVersion + "_" + module.revision + "." + artifact.extension
 }
+
+/*
+//Usually if you run the scala application as a standalone app
+//which is packed in a jar file, you should link or directly
+//compile within the jar the scala-lang jar in order to allow JVM 
+//to understand scala code
+//Anyway, since we execute our application through SPARK-SUBMIT
+//then this latter should already have a scala setup in it
+
+//INFO reference again from : 
+//https://mungingdata.com/apache-spark/building-jar-sbt/
+
+val classPath = Seq(
+  "scala-library-2.12.13.jar"
+)
+
+packageOptions += Package.ManifestAttributes(
+  "Class-Path" -> classPath.mkString(" ")
+)
+
+
+trapExit := false
+*/

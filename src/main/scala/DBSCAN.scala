@@ -42,15 +42,23 @@ object DBSCAN{
         Array(c)
     }
 
+    /*
+    def testSparkSub() = {
+        Logger.getLogger("org").setLevel(Level.ERROR)
+        val sc = SparkContext.getOrCreate()
+        println("Enter test")
+        sc.parallelize(Array(1,2,3,4))
+        sc.stop()
+    }
+    */
+
     //Label each point of the dataset with a label 
     
     def findClusters(inputFile : String, epsilon : Double, minCount : Int) : ModelWrapper = {
 
         Logger.getLogger("org").setLevel(Level.ERROR)
         //Configure Spark 
-        val conf = new SparkConf().setAppName("DBSCAN-distr")
-                                    .setMaster("local[*]")
-        val sc = SparkContext.getOrCreate(conf)
+        val sc = SparkContext.getOrCreate()
 
         //Read file from spark
         val linesList = sc.textFile(inputFile)
@@ -105,7 +113,7 @@ object DBSCAN{
                 clusterNum = clusterNum + 1
                 labels(driverP(it))=clusterNum
         
-                println("NEW CLUSTER "+clusterNum.toString)
+                //println("NEW CLUSTER "+clusterNum.toString)
         
         
                 while(queue.size>0){inbreak.breakable{
@@ -172,7 +180,38 @@ class ModelWrapper(
 
 object EntryPoint{
     def main(args: Array[String]) {
-        val file = "data/clusterin"
+        println("Enter main")
+        try {
+            
+        for(i <- 0 until args.length){
+            args(i) match {
+                case "--data-file" => {
+                    val file = args(i+1); 
+                    println("DATA FILE IS : "+file)
+                    }
+                case "--spark-app-name" => {
+                    val ctxName = args(i+1)
+                    println("SPARK APP NAME : "+ctxName)
+                }
+                case "--spark-app-url" => {
+                    val ctxURL = args(i+1)
+                    println("SPARK APP URL : "+ctxURL)
+                }
+                case _ => {}
+            }
+        }
+
+        } catch {
+            case e: java.lang.ArrayIndexOutOfBoundsException => {
+                println("Missing option value");
+                System.exit(-1)
+
+            }
+        }
+
+        //DBSCAN.testSparkSub()
+        //System.exit(0)
+        
         val model = DBSCAN.findClusters(file,5,5)
         println("FOUND "+model.getClustersNum()+" CLUSTERS")
     }
