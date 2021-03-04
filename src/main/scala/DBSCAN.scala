@@ -2,11 +2,10 @@ import math._
 import scala.util.control._
 import annotation._
 import org.apache.spark.SparkContext, org.apache.spark.SparkConf
+//TO AVOID FUCKING SPARK LOG
+import org.apache.log4j.{Level, Logger}
 
-class DBSCAN(val _epsilon : Double, val _minCount : Int){
-
-    private var epsilon = _epsilon
-    private var minCount = _minCount
+object DBSCAN{
     private val UNDEF : Int = -2
     val NOISE : Int = -1
     @transient private val outbreak = new Breaks;
@@ -45,15 +44,16 @@ class DBSCAN(val _epsilon : Double, val _minCount : Int){
 
     //Label each point of the dataset with a label 
     
-    def findClusters(inputFile : String) : ModelWrapper = {
+    def findClusters(inputFile : String, epsilon : Double, minCount : Int) : ModelWrapper = {
 
+        Logger.getLogger("org").setLevel(Level.ERROR)
         //Configure Spark 
         val conf = new SparkConf().setAppName("DBSCAN-distr")
                                     .setMaster("local[*]")
-        val sc = new SparkContext(conf)
+        val sc = SparkContext.getOrCreate(conf)
 
         //Read file from spark
-        val linesList = sc.textFile("clusterin")
+        val linesList = sc.textFile(inputFile)
 
         //Format as Seq[ Tuple2[Double] ]
         val regex = "\\s+"
@@ -146,6 +146,7 @@ class DBSCAN(val _epsilon : Double, val _minCount : Int){
             //JOIN ALL EXECUTORS I GUESS
         }}
 
+        sc.stop()
         //Create and return a ModelWrapper instance
         val mw = new ModelWrapper(clusterNum, labels)
         mw
@@ -159,7 +160,7 @@ class ModelWrapper(
             val labelV : collection.mutable.Map[(Double,Double),Int]){
 
     def getNoiseP() : Seq[ (Double,Double) ] = {
-        labelV.filter( _._2 == (new DBSCAN(0,0)).NOISE).keys.toSeq
+        labelV.filter( _._2 == DBSCAN.NOISE).keys.toSeq
     }
 
     def getClustersNum() : Int = labelN 
@@ -172,8 +173,7 @@ class ModelWrapper(
 object EntryPoint{
     def main(args: Array[String]) {
         val file = "data/clusterin"
-        val model = new DBSCAN(5,5)
-        val result = model.findClusters(file)
-        println("FOUND "+result.getClustersNum()+" CLUSTERS")
+        val model = DBSCAN.findClusters(file,5,5)
+        println("FOUND "+model.getClustersNum()+" CLUSTERS")
     }
 }
