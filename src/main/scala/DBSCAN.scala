@@ -101,7 +101,7 @@ object DBSCAN{
             //COLLECT C IN DRIVER
     
     
-            var queue = neighs.collect().filter(!cmp(driverP(it),_)).toSet
+            var queue = neighs.collect().toSet
             val c = queue.size
             //println("PRINT C "+c.toString)
     
@@ -115,6 +115,7 @@ object DBSCAN{
         
                 //println("NEW CLUSTER "+clusterNum.toString)
         
+                queue = queue.filter(!cmp(driverP(it),_))
         
                 while(queue.size>0){inbreak.breakable{
                     val h =queue.head
@@ -181,21 +182,22 @@ class ModelWrapper(
 object EntryPoint{
     def main(args: Array[String]) {
         println("Enter main")
+        var file : Option[String] = None 
+        var epsilon : Option[String] = None
+        var minc : Option[String] = None
         try {
             
         for(i <- 0 until args.length){
             args(i) match {
                 case "--data-file" => {
-                    val file = args(i+1); 
+                    file = Option(args(i+1))
                     println("DATA FILE IS : "+file)
                     }
-                case "--spark-app-name" => {
-                    val ctxName = args(i+1)
-                    println("SPARK APP NAME : "+ctxName)
+                case "--eps" => {
+                    epsilon = Option(args(i+1))
                 }
-                case "--spark-app-url" => {
-                    val ctxURL = args(i+1)
-                    println("SPARK APP URL : "+ctxURL)
+                case "--minc" => {
+                    minc = Option(args(i+1))
                 }
                 case _ => {}
             }
@@ -209,10 +211,18 @@ object EntryPoint{
             }
         }
 
+        if(file == None || epsilon == None || minc == None){
+            println("Args missing")
+            System.exit(-1)
+        }
+
         //DBSCAN.testSparkSub()
         //System.exit(0)
         
-        val model = DBSCAN.findClusters(file,5,5)
+        val model = DBSCAN.findClusters(
+                        file.get,
+                        epsilon.get.toDouble,
+                        minc.get.toInt)
         println("FOUND "+model.getClustersNum()+" CLUSTERS")
     }
 }

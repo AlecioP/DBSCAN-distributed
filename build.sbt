@@ -9,9 +9,10 @@ developers ++= List(
   Developer("andreaErco", "Andrea Ercolessi", "@andreaErco", url("https://github.com/andreaErco"))
 )
 
-//Emr-5.32.0 uses Spark 2.4.7 which in turn uses Scala 2.12
-//https://spark.apache.org/docs/2.4.7/
+//Emr-5.32.0 uses Spark 2.4.7 which in turn uses Scala 2.11.12
+//Run spark-shell on cluster driver to find out
 
+//scalaVersion := "2.11.12"
 scalaVersion := "2.12.13"
 
 val sparkVersion = "2.4.7"
@@ -40,7 +41,7 @@ artifactName := { (sv: ScalaVersion, module: ModuleID, artifact: Artifact) =>
   artifact.name + "_" + sv.binary + "-" + sparkVersion + "_" + module.revision + "." + artifact.extension
 }
 
-/*
+
 //Usually if you run the scala application as a standalone app
 //which is packed in a jar file, you should link or directly
 //compile within the jar the scala-lang jar in order to allow JVM 
@@ -51,8 +52,9 @@ artifactName := { (sv: ScalaVersion, module: ModuleID, artifact: Artifact) =>
 //INFO reference again from : 
 //https://mungingdata.com/apache-spark/building-jar-sbt/
 
+/*
 val classPath = Seq(
-  "scala-library-2.12.13.jar"
+  "scala-library-2.11.12.jar"
 )
 
 packageOptions += Package.ManifestAttributes(
