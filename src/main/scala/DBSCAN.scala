@@ -90,13 +90,14 @@ object DBSCAN{
         (1,2)(3,4)
         */
 
-        
+        println("POINTS SIZE "+points.count())
         //Maintain a copy of The points in the driver
         val driverP = points.collect()
+        println("DRIVERP SIZE "+driverP.size)
 
-        for(elem <- driverP){
-            println("("+elem._1+","+elem._2+")")
-        }
+        //for(elem <- driverP){
+            //println("("+elem._1+","+elem._2+")")
+        //}
 
         /*
         Create a mutable map for the points labels 
@@ -107,11 +108,11 @@ object DBSCAN{
                                                 toSeq : _*
                                             )
 
-        println(labels.keySet.size)
+        println("LABELS SIZE "+labels.keySet.size)
         //Init current number of Clusters found
         var clusterNum = 0
 
-        val dim = points.count()
+        val dim = driverP.size
 
         var remaining = dim
 
@@ -154,8 +155,8 @@ object DBSCAN{
                     if(  dim - remaining  < 0){
                         for(rem <- queue ){
                             labels(rem) = clusterNum
-                            outbreak.break
                         }
+                        outbreak.break
                     }
                     val h =queue.head
                     val pStr = "("+h._1.toString + "," +  h._2.toString + ")"
