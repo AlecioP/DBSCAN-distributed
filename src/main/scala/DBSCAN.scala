@@ -152,7 +152,7 @@ object DBSCAN{
         
                 while(queue.size>0){inbreak.breakable{
 
-                    if(  dim - remaining  < 0){
+                    if( remaining  <= 0){
                         for(rem <- queue ){
                             labels(rem) = clusterNum
                         }
