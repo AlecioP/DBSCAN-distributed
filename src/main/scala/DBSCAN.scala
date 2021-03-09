@@ -8,6 +8,7 @@ import org.apache.log4j.{Level, Logger}
 object DBSCAN{
     private val UNDEF : Int = -2
     val NOISE : Int = -1
+    // TRANSIENT : Do Not serialize 
     @transient private val outbreak = new Breaks;
     @transient private val inbreak = new Breaks;
 
@@ -23,6 +24,7 @@ object DBSCAN{
         ((p1._1 == p2._1) && (p1._2 == p2._2))
     }
 
+    //https://github.com/apache/spark/blob/master/core/src/main/scala/org/apache/spark/rdd/RDD.scala
     //Useless function to replace RDD.count()
     def bCount(anRdd : org.apache.spark.rdd.RDD[(Double,Double)]) = {
         anRdd.map(x => ("same", (1,x) ))
@@ -63,16 +65,38 @@ object DBSCAN{
         //Read file from spark
         val linesList = sc.textFile(inputFile)
 
-        //Format as Seq[ Tuple2[Double] ]
+        //Format as Seq[ Tuple2[Double] ] 
         val regex = "\\s+"
-        val points=linesList.flatMap(
+        var points=linesList.flatMap(
                     x=>toCouple(
                         x.split(regex).map( x=>toDouble(x) )
                     )
-        )
+        //Remove duplicate keys
+        ).map((_,1)).reduceByKey((v1,v2)=>v1+v2).keys
 
+        /*
+        (1,2)(3,4)(1,2)
+
+        MAP
+
+        [(1,2); 1][(3,4); 1][(1,2); 1]
+
+        REDUCE
+        
+        [(1,2); 2][(3,4); 1]
+
+        KEYS
+
+        (1,2)(3,4)
+        */
+
+        
         //Maintain a copy of The points in the driver
         val driverP = points.collect()
+
+        for(elem <- driverP){
+            println("("+elem._1+","+elem._2+")")
+        }
 
         /*
         Create a mutable map for the points labels 
@@ -80,12 +104,16 @@ object DBSCAN{
         */
         val labels = collection.mutable.Map(   points.collect()
                                                 .map( (_,UNDEF) )   
-                                                toSeq : _*)
+                                                toSeq : _*
+                                            )
 
+        println(labels.keySet.size)
         //Init current number of Clusters found
         var clusterNum = 0
 
         val dim = points.count()
+
+        var remaining = dim
 
         for(it <- 0 until dim.toInt){outbreak.breakable{
     
@@ -107,21 +135,32 @@ object DBSCAN{
     
             if(c<minCount){
                 labels(driverP(it))=NOISE
+                remaining=remaining+1
             }
             else{
                 //CLUSTER LABEL 
                 clusterNum = clusterNum + 1
                 labels(driverP(it))=clusterNum
+
+
+                remaining=remaining + c
         
                 //println("NEW CLUSTER "+clusterNum.toString)
         
                 queue = queue.filter(!cmp(driverP(it),_))
         
                 while(queue.size>0){inbreak.breakable{
+
+                    if(  dim - remaining  < 0){
+                        for(rem <- queue ){
+                            labels(rem) = clusterNum
+                            outbreak.break
+                        }
+                    }
                     val h =queue.head
                     val pStr = "("+h._1.toString + "," +  h._2.toString + ")"
            
-                    if(  labels(h)  == NOISE) {labels(h)= clusterNum}
+                    if(  labels(h)  == NOISE) {labels(h)= clusterNum ; remaining=remaining-1}
                     if(  labels(h)  != UNDEF) {queue = queue.filter(!cmp(h,_));inbreak.break}
             
                     //println("Add "+pStr+" to cluster "+clusterNum.toString)
@@ -144,6 +183,7 @@ object DBSCAN{
                         val nNeighs = driverNn.filter(labels(_)< (-1))
                         //REMOVE THE ELEMENT COMPUTED, ADD ITS NEIGHBORS
                         queue = queue.filter(!cmp(h,_) ) ++ nNeighs
+                        remaining = remaining + nNeighs.size
                     }else{
                         //println("REMOVE "+h.toString)
                         queue = queue.filter(!cmp(h,_) )
@@ -153,7 +193,7 @@ object DBSCAN{
             }//ELSE
     
             //JOIN ALL EXECUTORS I GUESS
-        }}
+        }}//FOR
 
         sc.stop()
         //Create and return a ModelWrapper instance
@@ -218,11 +258,13 @@ object EntryPoint{
 
         //DBSCAN.testSparkSub()
         //System.exit(0)
-        
+        val t0 = System.nanoTime
         val model = DBSCAN.findClusters(
                         file.get,
                         epsilon.get.toDouble,
                         minc.get.toInt)
+        val t1 = System.nanoTime
+        println("Elapsed time : "+(t1-t0)/math.pow(10,9)+" seconds")
         println("FOUND "+model.getClustersNum()+" CLUSTERS")
     }
 }

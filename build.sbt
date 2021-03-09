@@ -12,7 +12,10 @@ developers ++= List(
 //Emr-5.32.0 uses Spark 2.4.7 which in turn uses Scala 2.11.12
 //Run spark-shell on cluster driver to find out
 
+//FOR AWS EXECUTION
 //scalaVersion := "2.11.12"
+
+//FOR LOCAL EXECUTION
 scalaVersion := "2.12.13"
 
 val sparkVersion = "2.4.7"
@@ -42,25 +45,22 @@ artifactName := { (sv: ScalaVersion, module: ModuleID, artifact: Artifact) =>
 }
 
 
-//Usually if you run the scala application as a standalone app
-//which is packed in a jar file, you should link or directly
-//compile within the jar the scala-lang jar in order to allow JVM 
-//to understand scala code
-//Anyway, since we execute our application through SPARK-SUBMIT
-//then this latter should already have a scala setup in it
-
-//INFO reference again from : 
-//https://mungingdata.com/apache-spark/building-jar-sbt/
-
 /*
-val classPath = Seq(
-  "scala-library-2.11.12.jar"
-)
+  Usually if you run the scala application as a standalone app
+  which is packed in a jar file, you should link or directly
+  compile within the jar the scala-lang jar in order to allow JVM 
+  to understand scala code
+  Anyway, since we execute our application through SPARK-SUBMIT
+  then this latter should already have a scala setup in it
 
-packageOptions += Package.ManifestAttributes(
-  "Class-Path" -> classPath.mkString(" ")
-)
+  INFO reference again from : 
+  https://mungingdata.com/apache-spark/building-jar-sbt/
 
+  val classPath = Seq(
+    "scala-library-2.11.12.jar"
+  )
 
-trapExit := false
+  packageOptions += Package.ManifestAttributes(
+    "Class-Path" -> classPath.mkString(" ")
+  )
 */
