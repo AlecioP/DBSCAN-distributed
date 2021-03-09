@@ -114,7 +114,7 @@ object DBSCAN{
 
         val dim = driverP.size
 
-        var remaining = dim
+        
 
         for(it <- 0 until dim.toInt){outbreak.breakable{
     
@@ -136,32 +136,20 @@ object DBSCAN{
     
             if(c<minCount){
                 labels(driverP(it))=NOISE
-                remaining=remaining+1
             }
             else{
                 //CLUSTER LABEL 
                 clusterNum = clusterNum + 1
                 labels(driverP(it))=clusterNum
-
-
-                remaining=remaining + queue.filter(labels(_)<NOISE).size
-        
-                //println("NEW CLUSTER "+clusterNum.toString)
         
                 queue = queue.filter(!cmp(driverP(it),_))
         
                 while(queue.size>0){inbreak.breakable{
 
-                    if( remaining  <= 0){
-                        for(rem <- queue ){
-                            labels(rem) = clusterNum
-                        }
-                        inbreak.break
-                    }
                     val h =queue.head
-                    val pStr = "("+h._1.toString + "," +  h._2.toString + ")"
+                    //val pStr = "("+h._1.toString + "," +  h._2.toString + ")"
            
-                    if(  labels(h)  == NOISE) {labels(h)= clusterNum ; remaining=remaining-1}
+                    if(  labels(h)  == NOISE) {labels(h)= clusterNum }
                     if(  labels(h)  != UNDEF) {queue = queue.filter(!cmp(h,_));inbreak.break}
             
                     //println("Add "+pStr+" to cluster "+clusterNum.toString)
@@ -184,7 +172,6 @@ object DBSCAN{
                         val nNeighs = driverNn.filter(labels(_)< NOISE)
                         //REMOVE THE ELEMENT COMPUTED, ADD ITS NEIGHBORS
                         queue = queue.filter(!cmp(h,_) ) ++ nNeighs
-                        remaining = remaining + nNeighs.filter(labels(_)<NOISE).size
                     }else{
                         //println("REMOVE "+h.toString)
                         queue = queue.filter(!cmp(h,_) )
