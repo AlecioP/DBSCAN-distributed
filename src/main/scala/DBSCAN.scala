@@ -144,7 +144,7 @@ object DBSCAN{
                 labels(driverP(it))=clusterNum
 
 
-                remaining=remaining + c
+                remaining=remaining + queue.filter(labels(_)<NOISE).size
         
                 //println("NEW CLUSTER "+clusterNum.toString)
         
@@ -156,7 +156,7 @@ object DBSCAN{
                         for(rem <- queue ){
                             labels(rem) = clusterNum
                         }
-                        outbreak.break
+                        inbreak.break
                     }
                     val h =queue.head
                     val pStr = "("+h._1.toString + "," +  h._2.toString + ")"
@@ -181,10 +181,10 @@ object DBSCAN{
                     //println("PRINT C1 "+c1.toString)
                     if(c1>= minCount){
                         //println("Update queue for cluster "+clusterNum.toString)
-                        val nNeighs = driverNn.filter(labels(_)< (-1))
+                        val nNeighs = driverNn.filter(labels(_)< NOISE)
                         //REMOVE THE ELEMENT COMPUTED, ADD ITS NEIGHBORS
                         queue = queue.filter(!cmp(h,_) ) ++ nNeighs
-                        remaining = remaining + nNeighs.size
+                        remaining = remaining + nNeighs.filter(labels(_)<NOISE).size
                     }else{
                         //println("REMOVE "+h.toString)
                         queue = queue.filter(!cmp(h,_) )
