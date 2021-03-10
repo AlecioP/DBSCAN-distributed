@@ -176,11 +176,12 @@ object DBSCAN{
                         //println("REMOVE "+h.toString)
                         queue = queue.filter(!cmp(h,_) )
                     }//ELSE
-            
+                    q.destroy
                 }}//WHILE
             }//ELSE
     
             //JOIN ALL EXECUTORS I GUESS
+            p.destroy
         }}//FOR
 
         sc.stop()
