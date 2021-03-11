@@ -2,6 +2,7 @@ import math._
 import scala.util.control._
 import annotation._
 import org.apache.spark.SparkContext, org.apache.spark.SparkConf
+import org.apache.spark.storage._
 //TO AVOID FUCKING SPARK LOG
 import org.apache.log4j.{Level, Logger}
 
@@ -72,7 +73,7 @@ object DBSCAN{
                         x.split(regex).map( x=>toDouble(x) )
                     )
         //Remove duplicate keys
-        ).map((_,1)).reduceByKey((v1,v2)=>v1+v2).keys
+        ).map((_,1)).reduceByKey((v1,v2)=>v1+v2).keys.persist(StorageLevel.MEMORY_ONLY_SER)
 
         /*
         (1,2)(3,4)(1,2)
