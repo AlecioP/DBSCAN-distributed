@@ -1,3 +1,5 @@
+val AwsBuild = false
+
 organization :="com.github.aleciop"
 
 name := "dbscan-distributed"
@@ -12,11 +14,14 @@ developers ++= List(
 //Emr-5.32.0 uses Spark 2.4.7 which in turn uses Scala 2.11.12
 //Run spark-shell on cluster driver to find out
 
-//FOR AWS EXECUTION
-//scalaVersion := "2.11.12"
 
-//FOR LOCAL EXECUTION
-scalaVersion := "2.12.13"
+if(AwsBuild){
+  //FOR AWS EXECUTION
+  scalaVersion := "2.11.12"
+}else{
+  //FOR LOCAL EXECUTION
+  scalaVersion := "2.12.13"
+}
 
 val sparkVersion = "2.4.7"
 
