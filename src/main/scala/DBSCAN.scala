@@ -20,13 +20,10 @@ object DBSCAN{
         )
     }
 
-    //Says wheter p1 equals p2 component-wise
     def cmp(p1:(Double,Double),p2:(Double,Double)): Boolean = {
         ((p1._1 == p2._1) && (p1._2 == p2._2))
     }
 
-    //https://github.com/apache/spark/blob/master/core/src/main/scala/org/apache/spark/rdd/RDD.scala
-    //Useless function to replace RDD.count()
     def bCount(anRdd : org.apache.spark.rdd.RDD[(Double,Double)]) = {
         anRdd.map(x => ("same", (1,x) ))
                 .reduceByKey( (v1,v2) => (v1._1+v2._1,v1._2) )
@@ -50,12 +47,12 @@ object DBSCAN{
         Logger.getLogger("org").setLevel(Level.ERROR)
         val sc = SparkContext.getOrCreate()
         println("Enter test")
-        sc.parallelize(Array(1,2,3,4))
+        val testArr : Array[(Double,Double)] = Array((7, 2), (5, 4), (9, 6), (4, 7), (8, 1), (2, 3))
+        val tree = new InNode(3,testArr,0)
+        sc.broadcast(tree)
         sc.stop()
     }
     */
-
-    //Label each point of the dataset with a label 
     
     def findClusters(inputFile : String, epsilon : Double, minCount : Int) : ModelWrapper = {
 
@@ -65,131 +62,94 @@ object DBSCAN{
 
         //Read file from spark
         val linesList = sc.textFile(inputFile)
-
-        //Format as Seq[ Tuple2[Double] ] 
         val regex = "\\s+"
-        var points=linesList.flatMap(
-                    x=>toCouple(
-                        x.split(regex).map( x=>toDouble(x) )
-                    )
+        var points=linesList.flatMap(x=>toCouple(x.split(regex).map( x=>toDouble(x) ))
         //Remove duplicate keys
-        ).map((_,1)).reduceByKey((v1,v2)=>v1+v2).keys.persist(StorageLevel.MEMORY_ONLY_SER)
+        ).map((_,1)).reduceByKey((v1,v2)=>v1+v2).keys//.persist(StorageLevel.MEMORY_ONLY_SER)
 
-        /*
-        (1,2)(3,4)(1,2)
+        val driverP : Array[(Double,Double)]= points.collect()
 
-        MAP
+        val labels = collection.mutable.Map(   points.collect().map( (_,UNDEF) )   toSeq : _*)
 
-        [(1,2); 1][(3,4); 1][(1,2); 1]
-
-        REDUCE
-        
-        [(1,2); 2][(3,4); 1]
-
-        KEYS
-
-        (1,2)(3,4)
-        */
-
-        println("POINTS SIZE "+points.count())
-        //Maintain a copy of The points in the driver
-        val driverP = points.collect()
-        println("DRIVERP SIZE "+driverP.size)
-
-        //for(elem <- driverP){
-            //println("("+elem._1+","+elem._2+")")
-        //}
-
-        /*
-        Create a mutable map for the points labels 
-        and maintain it into the Master
-        */
-        val labels = collection.mutable.Map(   points.collect()
-                                                .map( (_,UNDEF) )   
-                                                toSeq : _*
-                                            )
-
-        println("LABELS SIZE "+labels.keySet.size)
-        //Init current number of Clusters found
         var clusterNum = 0
 
         val dim = driverP.size
 
-        
+        def log2 : Double => Double = (q) => math.log10(q) / math.log10(2)
 
-        for(it <- 0 until dim.toInt){outbreak.breakable{
+        val LEAF_DIM = 1000
+
+        val d : Int = log2(dim/LEAF_DIM).toInt + 1 
+
+        val searchTree = new InNode(d,driverP,0)
+
+        val treeBC = sc.broadcast(searchTree)
+
+        for(p <- driverP){outbreak.breakable{
+
+            println("IN CLUSTER : "+ labels.filter(_._2 > NOISE).keySet.size )
+            println("NOISE : "+labels.filter(_._2 == NOISE).keySet.size)
+            println("UNDEF : "+labels.filter(_._2 == UNDEF).keySet.size)
+
+            var (t0,t1) = (0L,0L)
     
-            if( labels(driverP(it))!= UNDEF ) {outbreak.break}//CONTINUE 
+            if( labels(p)!= UNDEF ) {outbreak.break}//CONTINUE 
     
             //EACH EXECUTOR HAS A SUBSET SbS OF ALL THE POINTS
             //COMPUTE DISTANCE OF P FROM EACH POINT IN SbS
-            val p = sc.broadcast(driverP(it))
-    
-            //IN EXECUTOR
-            val neighs = points.filter(x => distance(p.value,x)<=epsilon)
-    
-            //COLLECT C IN DRIVER
-    
-    
-            var queue = neighs.collect().toSet
+          
+            t0 = System.nanoTime
+            var queue = searchTree.rangeQuery(epsilon,p,distance,0).toSet
+            t1 = System.nanoTime
+
+            println("SEQ TIME : "+(  (t1-t0)/math.pow(10,9))  )
+
             val c = queue.size
             //println("PRINT C "+c.toString)
     
-            if(c<minCount){
-                labels(driverP(it))=NOISE
-            }
-            else{
-                //CLUSTER LABEL 
-                clusterNum = clusterNum + 1
-                labels(driverP(it))=clusterNum
+            (c<minCount) match {
+                case true =>   labels(p)=NOISE
+                case false => {
+                    //CLUSTER LABEL 
+                    clusterNum = clusterNum + 1
+                    labels(p)=clusterNum
         
-                queue = queue.filter(!cmp(driverP(it),_))
-        
-                while(queue.size>0){inbreak.breakable{
+                    //queue = queue.filter(!cmp(p,_))
+                    queue = queue.filter(p1 => labels(p1)<=NOISE )
+                    queue.foreach(labels(_)=clusterNum )
 
-                    val h =queue.head
-                    //val pStr = "("+h._1.toString + "," +  h._2.toString + ")"
-           
-                    if(  labels(h)  == NOISE) {labels(h)= clusterNum }
-                    if(  labels(h)  != UNDEF) {queue = queue.filter(!cmp(h,_));inbreak.break}
-            
-                    //println("Add "+pStr+" to cluster "+clusterNum.toString)
-            
-                    labels(h) = clusterNum
-            
-                    val q = sc.broadcast(h)
-            
-                    val nN = points.filter(y => distance(q.value,y)<=epsilon)
-            
-                    //The neighboors of the neighboors
-                    val driverNn = nN.collect().toSet
-            
-                    //val c1 = nN.count() ----------->MORE SHUFFLING BUT LESS COMPUTATION IN DRIVER
-            
-                    val c1 = driverNn.size // ----->LESS SHUFFLING BUT MORE COMPUTATION IN DRIVER
-                    //println("PRINT C1 "+c1.toString)
-                    if(c1>= minCount){
-                        //println("Update queue for cluster "+clusterNum.toString)
-                        val nNeighs = driverNn.filter(labels(_)< NOISE)
-                        //REMOVE THE ELEMENT COMPUTED, ADD ITS NEIGHBORS
-                        queue = queue.filter(!cmp(h,_) ) ++ nNeighs
-                    }else{
-                        //println("REMOVE "+h.toString)
-                        queue = queue.filter(!cmp(h,_) )
-                    }//ELSE
-                    q.destroy
-                }}//WHILE
-            }//ELSE
+                    t0 = System.nanoTime
+                    var done = false
+                    while(!queue.isEmpty){
+                        done match {case false => {println("Enter");done=true} case true => {} }
+                        println("Queue dim : "+queue.size)
+
+                        //for (newN <- queue ){  labels(newN) = clusterNum} 
+                        
+
+                        points = sc.parallelize(queue.toSeq) // DRIVER ---shuffling---> EXECUTOR
+
+
+                        queue =  points.map(treeBC.value.rangeQuery(epsilon,_,distance,0))
+                                .filter(_.length >= minCount)
+                                .flatMap(a => a)
+                                .collect.toSet  // DRIVER <---shuffling--- EXECUTOR
+                        queue = queue.filter(p1 => labels(p1)<=NOISE )
+                        queue.foreach(labels(_)=clusterNum )
+                    }
+                    t1 = System.nanoTime
+                    println("NN TIME : "+(  (t1-t0)/math.pow(10,9))  )
+
+                }//Case false
+            }//Match c<minCount
     
             //JOIN ALL EXECUTORS I GUESS
-            p.destroy
+            
         }}//FOR
 
         sc.stop()
         //Create and return a ModelWrapper instance
-        val mw = new ModelWrapper(clusterNum, labels)
-        mw
-
+        new ModelWrapper(clusterNum, labels)
     /*FIND_CLUSTERS METHOD*/}
 
 }
@@ -248,6 +208,7 @@ object EntryPoint{
 
         //DBSCAN.testSparkSub()
         //System.exit(0)
+
         val t0 = System.nanoTime
         val model = DBSCAN.findClusters(
                         file.get,
@@ -258,3 +219,40 @@ object EntryPoint{
         println("FOUND "+model.getClustersNum()+" CLUSTERS")
     }
 }
+
+
+        /*
+            DRIVER : New Cluster from P0 
+
+            for p <- driverP 
+
+            val neighs = tree.rangeQuery(p)
+
+            if(neighs.dim < minCount)
+                p -> noise
+            else
+
+
+            P-NEIGHS = P1,P2,P3,P4,P5           P6,P7
+
+                var points =  sc.parallelize(P-NEIGHS)
+
+                points.flat
+
+                val subset = points.filter( _ in P-NEIGHS )
+                
+
+                P-NEIGHS = subset.flatMap(rangeQuery(_)<minCounts).collect
+
+
+                    Exec 1 : P1,P2            Exec 2 : P3             Exec 3  : P4
+        
+                            tree.search(P1) -> NN < minCount -> STOP
+                                                  >= flatMap -> NN
+
+                    tmp = nn.collect
+                    delete[] points
+                    points = sc.parallelize(tmp)
+                            
+        
+        */
