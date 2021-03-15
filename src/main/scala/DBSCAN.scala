@@ -84,16 +84,30 @@ object DBSCAN{
         val searchTree = new InNode(d,driverP,0)
 
         val treeBC = sc.broadcast(searchTree)
+        var index = 0 
 
-        for(p <- driverP){outbreak.breakable{
+        val SOMETIME = 1000
 
-            println("IN CLUSTER : "+ labels.filter(_._2 > NOISE).keySet.size )
-            println("NOISE : "+labels.filter(_._2 == NOISE).keySet.size)
-            println("UNDEF : "+labels.filter(_._2 == UNDEF).keySet.size)
+        outbreak.breakable{
+        for(p <- driverP){inbreak.breakable{
+            
+            index%SOMETIME match {
+                case 0 => {
+                    if(labels.filter(_._2 != UNDEF).keySet.size == dim){
+                        outbreak.break
+                    }
+                }
+                case _ => { }
+            }
+            index = index + 1
+
+            //println("IN CLUSTER : "+ labels.filter(_._2 > NOISE).keySet.size )
+            //println("NOISE : "+labels.filter(_._2 == NOISE).keySet.size)
+            //println("UNDEF : "+labels.filter(_._2 == UNDEF).keySet.size)
 
             var (t0,t1) = (0L,0L)
     
-            if( labels(p)!= UNDEF ) {outbreak.break}//CONTINUE 
+            if( labels(p)!= UNDEF ) {inbreak.break}//CONTINUE 
     
             //EACH EXECUTOR HAS A SUBSET SbS OF ALL THE POINTS
             //COMPUTE DISTANCE OF P FROM EACH POINT IN SbS
@@ -102,7 +116,7 @@ object DBSCAN{
             var queue = searchTree.rangeQuery(epsilon,p,distance,0).toSet
             t1 = System.nanoTime
 
-            println("SEQ TIME : "+(  (t1-t0)/math.pow(10,9))  )
+            //println("SEQ TIME : "+(  (t1-t0)/math.pow(10,9))  )
 
             val c = queue.size
             //println("PRINT C "+c.toString)
@@ -112,6 +126,7 @@ object DBSCAN{
                 case false => {
                     //CLUSTER LABEL 
                     clusterNum = clusterNum + 1
+                    //println("Should incr")
                     labels(p)=clusterNum
         
                     //queue = queue.filter(!cmp(p,_))
@@ -121,24 +136,34 @@ object DBSCAN{
                     t0 = System.nanoTime
                     var done = false
                     while(!queue.isEmpty){
-                        done match {case false => {println("Enter");done=true} case true => {} }
-                        println("Queue dim : "+queue.size)
+                        //done match {case false => {println("Enter");done=true} case true => {} }
+                        //println("Queue dim : "+queue.size)
 
                         //for (newN <- queue ){  labels(newN) = clusterNum} 
                         
-
                         points = sc.parallelize(queue.toSeq) // DRIVER ---shuffling---> EXECUTOR
 
+                        /*
+                        
+                        Fare un fold dei map dinamicamente per ridurre lo spazio 
+                        e magari il tempo se togliamo dall'insieme di ricerca
+                        
+                        */
+                        
+                        def arg1( acc1 : Set[(Double,Double)], acc2 : Set[(Double,Double)] ) = {
+                             acc1 ++ acc2 
+                        }
+                        def arg0(acc : Set[(Double,Double)],  p1 : (Double,Double)) = {  
+                            acc ++ treeBC.value.rangeQuery(epsilon,p1,distance,0).toSet 
+                        }
+                        
+                        queue = points.aggregate( Set() : Set[(Double,Double)]) (arg0,arg1) 
 
-                        queue =  points.map(treeBC.value.rangeQuery(epsilon,_,distance,0))
-                                .filter(_.length >= minCount)
-                                .flatMap(a => a)
-                                .collect.toSet  // DRIVER <---shuffling--- EXECUTOR
                         queue = queue.filter(p1 => labels(p1)<=NOISE )
                         queue.foreach(labels(_)=clusterNum )
                     }
                     t1 = System.nanoTime
-                    println("NN TIME : "+(  (t1-t0)/math.pow(10,9))  )
+                    //println("NN TIME : "+(  (t1-t0)/math.pow(10,9))  )
 
                 }//Case false
             }//Match c<minCount
@@ -146,11 +171,12 @@ object DBSCAN{
             //JOIN ALL EXECUTORS I GUESS
             
         }}//FOR
+        }
 
         sc.stop()
         //Create and return a ModelWrapper instance
         new ModelWrapper(clusterNum, labels)
-    /*FIND_CLUSTERS METHOD*/}
+    }/*FIND_CLUSTERS METHOD*/
 
 }
 
@@ -245,7 +271,7 @@ object EntryPoint{
                 P-NEIGHS = subset.flatMap(rangeQuery(_)<minCounts).collect
 
 
-                    Exec 1 : P1,P2            Exec 2 : P3             Exec 3  : P4
+                    Exec 1 : P1,P2,P9,P10            Exec 2 : P3             Exec 3  : P4
         
                             tree.search(P1) -> NN < minCount -> STOP
                                                   >= flatMap -> NN
