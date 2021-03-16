@@ -154,7 +154,11 @@ object DBSCAN{
                              acc1 ++ acc2 
                         }
                         def arg0(acc : Set[(Double,Double)],  p1 : (Double,Double)) = {  
-                            acc ++ treeBC.value.rangeQuery(epsilon,p1,distance,0).toSet 
+                            val nN = treeBC.value.rangeQuery(epsilon,p1,distance,0).toSet 
+                            nN.size >= minCount match {
+                                case true => {acc ++ nN}
+                                case false => acc
+                            }
                         }
                         
                         queue = points.aggregate( Set() : Set[(Double,Double)]) (arg0,arg1) 

@@ -17,8 +17,11 @@ file = sys.argv[1]
 epsilon = float(sys.argv[2])
 minc = float(sys.argv[3])
 
+X = np.unique(np.loadtxt(file),axis=0)
+#X = np.loadtxt(file)
+#X = np.unique(X, axis=0)
 
-X = np.loadtxt(file)
+print( X.shape)
 
 # #############################################################################
 # Compute DBSCAN
