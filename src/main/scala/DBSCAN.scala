@@ -88,6 +88,8 @@ object DBSCAN{
 
         val SOMETIME = 1000
 
+        val labelsBC = sc.broadcast(labels)
+
         outbreak.breakable{
         for(p <- driverP){inbreak.breakable{
             
@@ -157,9 +159,9 @@ object DBSCAN{
                             var nN = treeBC.value.rangeQuery(epsilon,p1,distance,0)
                             nN.size >= minCount match {
                                 case true => {
-                                    nN = nN.filter(p2 => labels(p2)<=NOISE )
+                                    nN = nN.filter(p2 => labelsBC.value(p2)<=NOISE )
                                     //This modifies only the local copy but this way is more efficient
-                                    nN.foreach(labels(_)=clusterNum)
+                                    nN.foreach(labelsBC.value(_)=clusterNum)
                                     acc ++ nN.toSet
                                 }
                                 case false => acc
