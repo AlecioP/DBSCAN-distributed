@@ -154,16 +154,21 @@ object DBSCAN{
                              acc1 ++ acc2 
                         }
                         def arg0(acc : Set[(Double,Double)],  p1 : (Double,Double)) = {  
-                            val nN = treeBC.value.rangeQuery(epsilon,p1,distance,0).toSet 
+                            var nN = treeBC.value.rangeQuery(epsilon,p1,distance,0)
                             nN.size >= minCount match {
-                                case true => {acc ++ nN}
+                                case true => {
+                                    nN = nN.filter(p2 => labels(p2)<=NOISE )
+                                    //This modifies only the local copy but this way is more efficient
+                                    nN.foreach(labels(_)=clusterNum)
+                                    acc ++ nN.toSet
+                                }
                                 case false => acc
                             }
                         }
                         
                         queue = points.aggregate( Set() : Set[(Double,Double)]) (arg0,arg1) 
 
-                        queue = queue.filter(p1 => labels(p1)<=NOISE )
+                        //queue = queue.filter(p1 => labels(p1)<=NOISE )
                         queue.foreach(labels(_)=clusterNum )
                     }
                     t1 = System.nanoTime
