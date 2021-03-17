@@ -44,13 +44,13 @@ Then you can install SBT :
 `MACOS`
 
 ~~~shell
-#brew install sbt
+brew install sbt
 ~~~
 
 `UBUNTU`
 
 ~~~shell
-#sudo apt-get install sbt
+sudo apt-get install sbt
 ~~~
 
 ### To compile JAR locally 
@@ -82,16 +82,84 @@ To do that first go to your AWS console and open the [EC2](https://console.aws.a
 Once there, from the menu on the left go to <br>
 **Network & Security**>**Key Pairs**
 Here you can create a pair of keys to for remote connect via ssh to an EC2 machine
-Follow the wizard, create the keys-pair, save you copy to your local machine
-**NOTE** : Be aware of where the *\*.pem* file has been saved on your machine and of course don't loose it. 
+Follow the wizard, create the keys-pair, save you copy to your local machine <br>
+**NOTE** : Be aware of where the *\*.pem* file has been saved on your machine and of course don't loose it. <br>Alternatively install `AWS-CLI`:
+
+`MACOS`
+~~~shell
+brew install awscli
+~~~
+
+`UBUNTU`
+~~~shell
+sudo apt-get install awscli
+~~~
+
+Once done :
+
+~~~shell
+export KEYNAME=SomeNameForKey
+
+#Name the file with *.pem extension
+export KEYFILE=/full/path/to/new/file/containing/key.pem
+
+aws ec2 create-key-pair --key-name $KEYNAME --query 'KeyMaterial' --output text > $KEYFILE
+~~~
 
 Now we can create our cluster 
 Go to [EMR](https://console.aws.amazon.com/elasticmapreduce/) service page.
 Here, from the menu on the left, click into *Clusters* then create a cluster.
-Select the number of nodes that compose your cluster, the kind of node according to your needs, choose the *Spark* version to execute (the one we use is Spark-2.4.7-aws from Emr-5.32.0, but you can change through build file), but most importantly choose the key-pair you just created from the security section.
+Select the number of nodes that compose your cluster, the kind of node according to your needs, choose the *Spark* version to execute (the one we use is Spark-2.4.7-aws from Emr-5.32.0, but you can change through build file), but most importantly choose the key-pair you just created from the security section.<br>
+With `AWS-CLI` :
+
+~~~shell
+
+#CUSTOMIZE ALL THESE PARAMETERS
+
+export KEYNAME=TheKeyNameInThePreviewSection
+export SUBNET_ID=TheIdOfSubnet
+export EXECUTOR_SECURITY_GROUP=SecurityGroupForExecutor
+export DRIVER_SECURITY_GROUP=SecurityGroupForDriver
+export LOG_BUCKET=s3://S3BucketForLog
+export EMR_VERSION=emr-5.32.0
+
+export CLUSTER_NAME=SomeName
+
+export EXECUTOR_INSTANCE_TYPE=t4g.nano
+export EXECUTOR_INSTANCE_NUM=2
+
+export DRIVER_INSTANCE_TYPE=t4g.nano
+
+export REGION=us-east-1
+
+aws emr create-cluster --applications Name=Spark Name=Zeppelin \
+--ec2-attributes '{"KeyName":"${KEYNAME}","InstanceProfile":"EMR_EC2_DefaultRole","SubnetId":"${SUBNET_ID}","EmrManagedSlaveSecurityGroup":"${EXECUTOR_SECURITY_GROUP}","EmrManagedMasterSecurityGroup":"${DRIVER_SECURITY_GROUP}"}' \
+--service-role EMR_DefaultRole \
+--enable-debugging \
+--release-label $EMR_VERSION\
+--log-uri '${LOG_BUCKET}'\
+--name '${CLUSTER_NAME}' \
+--instance-groups '[{"InstanceCount":${EXECUTOR_INSTANCE_NUM},"EbsConfiguration":{"EbsBlockDeviceConfigs":[{"VolumeSpecification":{"SizeInGB":32,"VolumeType":"gp2"},"VolumesPerInstance":1}]},"InstanceGroupType":"CORE","InstanceType":"${EXECUTOR_INSTANCE_TYPE}","Name":"Core Instance Group"},{"InstanceCount":1,"EbsConfiguration":{"EbsBlockDeviceConfigs":[{"VolumeSpecification":{"SizeInGB":32,"VolumeType":"gp2"},"VolumesPerInstance":1}]},"InstanceGroupType":"MASTER","InstanceType":"${DRIVER_INSTANCE_TYPE}","Name":"Master Instance Group"}]'\
+--configurations '[{"Classification":"spark","Properties":{}}]' \
+--scale-down-behavior TERMINATE_AT_TASK_COMPLETION \
+--region $REGION
+~~~
 
 Now load into AWS the JAR we created previewsly. To do that go to [S3](https://s3.console.aws.amazon.com/s3/) service page.
-Create a new bucket and upload the JAR. Let's do the same with our *Dataset* file. You can load it into the same S3 bucket 
+Create a new bucket and upload the JAR. Let's do the same with our *Dataset* file. You can load it into the same S3 bucket. <br>
+Using `AWS-CLI` :
+
+~~~shell
+export S3_BUCKET_NAME=SomeName
+export APP_JAR=/Path/to/JAR.jar
+export DATASET_FILE=/Path/to/Dataset
+
+aws s3 mb s3://$S3_BUCKET_NAME
+
+aws s3 cp $APP_JAR s3://$BUCKET_NAME
+
+aws s3 cp $DATASET_FILE s3://$BUCKET_NAME
+~~~
 
 Now we have all ready to run our application. Go to your local machine and open a shell. Into the shell set a variable with the path to the aforementioned *\*.pem* file
 
@@ -120,7 +188,19 @@ ssh -i $AWS_AUTH_KEY $AWS_MASTER_URL
 Finally from the remote EC2 instance shell we can run our application via
 
 ~~~shell
-spark-submit --class EntryPoint s3://URL_OF_JAR_WITHIN_S3 --data-file s3://URL_OF_DATASET --eps 200 --minc 200
+spark-submit \
+--conf "spark.serializer=org.apache.spark.serializer.KryoSerializer" \
+--conf "spark.kryo.registrationRequired=true" \
+--conf "spark.kryo.classesToRegister=InNode,LeafNode" \
+--conf "spark.dynamicAllocation.enabled=false" \
+--conf "spark.default.parallelism=8" \
+--num-executors 8 \
+--executor-cores 1 \
+--class EntryPoint \
+s3://URL_OF_JAR_WITHIN_S3 \
+--data-file s3://URL_OF_DATASET \
+--eps 200 \
+--minc 200
 ~~~
 
 Write litterally **EntryPoint** which is the name of an object from the JAR
