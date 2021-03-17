@@ -1,4 +1,4 @@
-val AwsBuild = false
+val AwsBuild = true
 
 organization :="com.github.aleciop"
 

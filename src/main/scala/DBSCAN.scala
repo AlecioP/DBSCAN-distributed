@@ -88,8 +88,6 @@ object DBSCAN{
 
         val SOMETIME = 1000
 
-        val labelsBC = sc.broadcast(labels)
-
         outbreak.breakable{
         for(p <- driverP){inbreak.breakable{
             
@@ -102,79 +100,49 @@ object DBSCAN{
                 case _ => { }
             }
             index = index + 1
-
-            //println("IN CLUSTER : "+ labels.filter(_._2 > NOISE).keySet.size )
-            //println("NOISE : "+labels.filter(_._2 == NOISE).keySet.size)
-            //println("UNDEF : "+labels.filter(_._2 == UNDEF).keySet.size)
-
-            var (t0,t1) = (0L,0L)
     
             if( labels(p)!= UNDEF ) {inbreak.break}//CONTINUE 
-    
-            //EACH EXECUTOR HAS A SUBSET SbS OF ALL THE POINTS
-            //COMPUTE DISTANCE OF P FROM EACH POINT IN SbS
           
-            t0 = System.nanoTime
             var queue = searchTree.rangeQuery(epsilon,p,distance,0).toSet
-            t1 = System.nanoTime
-
-            //println("SEQ TIME : "+(  (t1-t0)/math.pow(10,9))  )
 
             val c = queue.size
-            //println("PRINT C "+c.toString)
     
             (c<minCount) match {
                 case true =>   labels(p)=NOISE
                 case false => {
                     //CLUSTER LABEL 
                     clusterNum = clusterNum + 1
-                    //println("Should incr")
+                    
                     labels(p)=clusterNum
         
-                    //queue = queue.filter(!cmp(p,_))
                     queue = queue.filter(p1 => labels(p1)<=NOISE )
                     queue.foreach(labels(_)=clusterNum )
 
-                    t0 = System.nanoTime
                     var done = false
                     while(!queue.isEmpty){
-                        //done match {case false => {println("Enter");done=true} case true => {} }
-                        //println("Queue dim : "+queue.size)
-
-                        //for (newN <- queue ){  labels(newN) = clusterNum} 
                         
                         points = sc.parallelize(queue.toSeq) // DRIVER ---shuffling---> EXECUTOR
-
-                        /*
-                        
-                        Fare un fold dei map dinamicamente per ridurre lo spazio 
-                        e magari il tempo se togliamo dall'insieme di ricerca
-                        
-                        */
-                        
+                        val labelsBC = sc.broadcast(labels)
                         def arg1( acc1 : Set[(Double,Double)], acc2 : Set[(Double,Double)] ) = {
                              acc1 ++ acc2 
                         }
                         def arg0(acc : Set[(Double,Double)],  p1 : (Double,Double)) = {  
                             var nN = treeBC.value.rangeQuery(epsilon,p1,distance,0)
-                            nN.size >= minCount match {
+                            (nN.size >= minCount) match {
                                 case true => {
                                     nN = nN.filter(p2 => labelsBC.value(p2)<=NOISE )
-                                    //This modifies only the local copy but this way is more efficient
-                                    nN.foreach(labelsBC.value(_)=clusterNum)
+                                    //This modifies only the local copy of labels but this way is more efficient
+                                    //nN.foreach(p3 => labelsBC.value(p3)=clusterNum)
                                     acc ++ nN.toSet
                                 }
                                 case false => acc
                             }
                         }
                         
-                        queue = points.aggregate( Set() : Set[(Double,Double)]) (arg0,arg1) 
-
-                        //queue = queue.filter(p1 => labels(p1)<=NOISE )
+                        queue = points.aggregate( Set() : Set[(Double,Double)]) (arg0,arg1)
+                        labelsBC.destroy 
                         queue.foreach(labels(_)=clusterNum )
                     }
-                    t1 = System.nanoTime
-                    //println("NN TIME : "+(  (t1-t0)/math.pow(10,9))  )
 
                 }//Case false
             }//Match c<minCount
@@ -256,40 +224,3 @@ object EntryPoint{
         println("FOUND "+model.getClustersNum()+" CLUSTERS")
     }
 }
-
-
-        /*
-            DRIVER : New Cluster from P0 
-
-            for p <- driverP 
-
-            val neighs = tree.rangeQuery(p)
-
-            if(neighs.dim < minCount)
-                p -> noise
-            else
-
-
-            P-NEIGHS = P1,P2,P3,P4,P5           P6,P7
-
-                var points =  sc.parallelize(P-NEIGHS)
-
-                points.flat
-
-                val subset = points.filter( _ in P-NEIGHS )
-                
-
-                P-NEIGHS = subset.flatMap(rangeQuery(_)<minCounts).collect
-
-
-                    Exec 1 : P1,P2,P9,P10            Exec 2 : P3             Exec 3  : P4
-        
-                            tree.search(P1) -> NN < minCount -> STOP
-                                                  >= flatMap -> NN
-
-                    tmp = nn.collect
-                    delete[] points
-                    points = sc.parallelize(tmp)
-                            
-        
-        */
