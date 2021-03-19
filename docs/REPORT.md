@@ -93,9 +93,14 @@ Dato l'albero ordinato nel momento in cui si vuole cercare l'insieme dei punti n
 
 Come mostra la figura l'albero suddivide lo spazio in aree di forma rettangolare, mentre il nostro algoritmo prevede la ricerca di punti in aree circolari. Pertanto durante la ricerca sull'albero dei punti, andiamo a selezionare la minima area rettangolora che comprende quella circolare rappresentante il nostro intorno.
 Tra tutti i punti che sono presenti nel primo insieme vengono calcolati quelli utili al algoritmo tramite una scansione lineare che ne calcola la distanza rispetto al centro **p**. La complessità di tale operazione  dipende sia dalla profondita' dell'albero che dalla conseguente dimensione dei nodi foglia che devono essere scansionati linearmente.
-
+<kbd>
 ![title](../img/pseudo1.png)
+</kbd>
+|
+<kbd>
 ![title](../img/pseudo2.png)
+</kbd>
+
 ### Main loop
 Prima di avviare la computazione, dobbiamo definire due valori costanti a priori, che sono **Epsilon** e **MinCount**. Questi parametri definiscono il comportamento dell'algoritmo e vengono passati da linea di comando tramite le opzioni `--eps` e `--minc` rispettivamente.
 
@@ -126,10 +131,10 @@ La fase dell'algoritmo che computazionalmente e' piu' costosa, e' sicuramente la
 
 Abbiamo preso in considerazione alcune alternative, per cercare di ottimizzare la complessita' dell'operazione di ricerca dei vicini. Le alternative che vagliate sono state : 
 
--In una prima implementazione avevamo pensato di suddividere la scansione sequenziale di tutti i punti sui nodi *Executor* in modo che ognuno di questi effetuasse **N/e** confronti, dove **N** e' il numero totale di confronti da fare per trovare il vicinato di un punto **p**, ed **e** e' il numero di *Executor* a disposizione all'interno del cluster. Questa implentazione nonostante sia scalabile nel momento in cui si vuole calcolare il vicinato di pochi punti, non lo e' invece nel momento in cui si deve calcolare il vicinato di tutti i punti nel *Dataset*. Nonostante la suddivisione sugli *Executor*, il numero di cofronti continua ad essere nell'ordine di **O(n^2)** per ognuno dei nodi. A dimostrazione di quanto detto riportiamo un caso di esecuzione particolarmente inefficiente.
+- In una prima implementazione avevamo pensato di suddividere la scansione sequenziale di tutti i punti sui nodi *Executor* in modo che ognuno di questi effetuasse **N/e** confronti, dove **N** e' il numero totale di confronti da fare per trovare il vicinato di un punto **p**, ed **e** e' il numero di *Executor* a disposizione all'interno del cluster. Questa implentazione nonostante sia scalabile nel momento in cui si vuole calcolare il vicinato di pochi punti, non lo e' invece nel momento in cui si deve calcolare il vicinato di tutti i punti nel *Dataset*. Nonostante la suddivisione sugli *Executor*, il numero di cofronti continua ad essere nell'ordine di **O(n^2)** per ognuno dei nodi. A dimostrazione di quanto detto riportiamo un caso di esecuzione particolarmente inefficiente.
 Durante la fase di testing di questa prima implementazione infatti, l'esecuzione dell'algoritmo su un *Dataset* di 400mila vettori, con configurazione di parametri **epsilon=200,minCount=200** ed un numero di nodi pari a 2, il tempo di esecuzione risultava essere di: **239857,80 secondi(66,62 ore)**
 
--**Pre-calcolare una matrice delle distanze**: durante la fase di progettazione dell'algoritmo, abbiamo analizzato l'implementazione di *DBSCAN* nella libreria **Scikit-learn**. Nonostante tale implementazione sia una versione sequenziale, ci e' sembrato interessante l'utilizzo di una matrice, dove vengono pre-calcolate le distanze tra i punti. <br> Tuttavia, anche se questo espediente potrebbe apportare dei miglioramenti in termini di complessita' temporale, e' noto agli utilizzatori della libreria che questa implementazione e' considerevolmente inefficiente in termini di complessita' spaziale. Questo rende tale approccio inutile ai nostri fini, che sono quelli di lavorare con grandi *Dataset*. 
+- **Pre-calcolare una matrice delle distanze**: durante la fase di progettazione dell'algoritmo, abbiamo analizzato l'implementazione di *DBSCAN* nella libreria **Scikit-learn**. Nonostante tale implementazione sia una versione sequenziale, ci e' sembrato interessante l'utilizzo di una matrice, dove vengono pre-calcolate le distanze tra i punti. <br> Tuttavia, anche se questo espediente potrebbe apportare dei miglioramenti in termini di complessita' temporale, e' noto agli utilizzatori della libreria che questa implementazione e' considerevolmente inefficiente in termini di complessita' spaziale. Questo rende tale approccio inutile ai nostri fini, che sono quelli di lavorare con grandi *Dataset*. 
 
 ## Test
 
@@ -233,3 +238,35 @@ Da questi test iniziali, i cluster individuati sono stati questi :
 Il dataset contenente circa 300 mila istanze e' troppo grande perche' l'algoritmo lo possa elaborare su una singola macchina, per questo motivo il dataset e' stato campionato e sono stati estratti un ottavo dei dati
 
 Lo script python utilizzato per creare questi risultati e' disponibile [qui](../py-util/pydbscan.py)
+
+#### CONFIGURATION : Epsilon = 0,07 MinCount = 20    
+
+| # DATASET                                                     | 11164 | 22166 | 43679 | 85002 | 162862  | 304675   |
+|---------------------------------------------------------------|--------|--------|--------|--------|----------|-----------|
+| 2-Nodes m4.large  [2-vCPU from Intel Xeon E5-2686 v4@2,3 GHz] | 81.70  | 102.83 | 163.52 | 239.93 | 507.57   | 1291.24  |
+| 4-Nodes                                                       | 84.27  | 109.16 | 156.46 | 229.03 | 445.51   | 1010.65  |
+| 8-Nodes                                                       | 95.57  | 130.43 | 179.73 | 241.59 | 406.05   | 824.48    |
+| 16-Nodes                                                      | 120.49 | 138.88 | 191.98 | 268.12 | 489.39   | 867.20    |
+
+Graficamente :
+<kbd>
+![title](../img/Timings_0dt07_20(v1_1).png)
+</kbd>
+
+#### CONFIGURATION : Epsilon = 200 MinCount = 200  
+
+| # DATASET                                                     | 11164 | 22166 | 43679 | 85002 | 162862  | 304675   |
+|---------------------------------------------------------------|--------|--------|--------|--------|----------|-----------|
+| 2-Nodes m4.large  [2-vCPU from Intel Xeon E5-2686 v4@2,3 GHz] | 48.83  | 81.26  | 227.29 | 870.99 | 3502.70 | 18136.12 |
+| 4-Nodes                                                       | 43.10  | 59.52  | 135.51 | 465.81 | 2465.11 | 9612.66  |
+| 8-Nodes                                                       | 45.95  | 50.63  | 95.64  | 266.63 | 1008.32 | 5054     |
+| 16-Nodes                                                      | 48.05  | 56.21  | 81.81  | 175.96 | 635.18   | 2439.27  |
+
+Graficamente:
+<kbd>
+![title](../img/Timings_200_200(v1_1).png)
+</kbd>
+
+## Compilazione ed Esecuzione
+
+Per compilare ed eseguire il codice, seguire le istruzioni nel documento [README.md](../README.md)
