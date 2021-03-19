@@ -239,6 +239,11 @@ Il dataset contenente circa 300 mila istanze e' troppo grande perche' l'algoritm
 
 Lo script python utilizzato per creare questi risultati e' disponibile [qui](../py-util/pydbscan.py)
 
+### Efficienza 
+
+Di seguito vengono riportati i dati riguardanti i test sulle tempistiche di esecuzione dell'algoritmo implementato. Per effettuare questi test, abbiamo utilizzato il servizio EMR di AWS (*Amazon Web Services*). Su tale servizio abbiamo creato cluster da 2/4/8/16 Nodi *Executor* di tipologia **m4.large**. Questo tipo di istanze dispone di 2 *vCPU* corrispondenti a 2 *HW-thread* di Processori **Intel Xeon E5-2686 v4** da 2.3 GHz. Su questi cluster e' stata lanciata una test suite di 48 Test che differiscono per numero di vettori in input, parametri dell'algoritmo e tipologia di cluster. Degli ultimi due aspetti abbiamo gia' parlato in precedenza, mentre per quanto riguarda il numero di vettori in input, abbiamo gia' detto che il *DATASET* in input contiene circa 300 mila vettori. Per testare le prestazioni dell'algoritmo su dataset di dimensioni variabili, abbiamo campionato dal dataset completo 1/32, 1/16, 1/8, 1/4 ed 1/2 dei vettori per poi andare ad eliminare le coppie di punti ripetute. 
+Il risultati per la configurazione di parametri **[Epsilon=0.07,minCount=20]** sono riportati in tabella ed in seguito graficamente :  
+
 #### CONFIGURATION : Epsilon = 0,07 MinCount = 20    
 
 | # DATASET                                                     | 11164 | 22166 | 43679 | 85002 | 162862  | 304675   |
@@ -253,6 +258,7 @@ Graficamente :
 ![title](../img/Timings_0dt07_20(v1_1).png)
 </kbd>
 
+I risultati per la configurazione di parametri **[Epsilon=200,minCount=200]** sono riportati in tabella ed in seguito graficamente : 
 #### CONFIGURATION : Epsilon = 200 MinCount = 200  
 
 | # DATASET                                                     | 11164 | 22166 | 43679 | 85002 | 162862  | 304675   |
@@ -266,6 +272,8 @@ Graficamente:
 <kbd>
 ![title](../img/Timings_200_200(v1_1).png)
 </kbd>
+
+Come sottolineato nelle sezioni precedenti, vediamo come la scalabilita' dell'algoritmo sia significativa laddove l'insieme di punti che ogni Nodo deve elaborare e' di una cardinalita' grande a sufficienza. Questo e' possibile solo in configurazioni che vanno a generare un numero di cluster ridotto (Esempio **[Epsilon=200,minCount=200]**) oppure dove il numero di Nodi *Executor* non e' cosi' elevato da dividere il dataset in sottoinsiemi troppo piccoli. Ovviamente, mentre la prima condizione non e' prevedibile a priori, sulla seconda l'utilizzatore del software implementato ha un controllo maggiore.  
 
 ## Compilazione ed Esecuzione
 
